@@ -2,12 +2,12 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 
 {
   imports =
     [ # Include the results of the hardware scan.
-      /etc/nixos/hardware-configuration.nix
+      ./hardware-configuration.nix
     ];
 
   # Bootloader.
@@ -35,8 +35,8 @@
   services.xserver.enable = true;
 
   # Enable the GNOME Desktop Environment.
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
+  services.xserver.displayManager.lightdm.enable = true;
+  services.xserver.desktopManager.xfce.enable = true;
 
   # Configure keymap in X11
   services.xserver.xkb = {
@@ -71,6 +71,9 @@
     isNormalUser = true;
     description = "Kelli";
     extraGroups = [ "networkmanager" "wheel" ];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK0TxQIY4UN70RdFGZgrXrFCO0qPCZEqq9PuCZH5rBye kelli@kelli-Mint-Desktop"
+    ];
     packages = with pkgs; [
     #  thunderbird
     ];
@@ -85,15 +88,20 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-   vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-   wget
-   git
-   emacs
-   sublime3
-   ghostty
-   xclip
-   tealdeer
-   bat
+    vim # Do not forget to add an editor! The Nano editor is also installed by default.
+    wget
+    git
+    emacs
+    sublime3
+    tree
+    ghostty
+    xclip
+    tealdeer
+    bat
+    python314
+    php
+    mysql84
+    ffmpeg-full
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -110,13 +118,68 @@
   # List services that you want to enable:
 
   # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
+  services.openssh = {
+    enable = true;
+    settings = {
+      X11Forwarding = true;
+      PermitRootLogin = "no"; # disable root login
+      PasswordAuthentication = false; # disable password login
+    };
+    openFirewall = true;
+  };
+
+  networking.networkmanager.ensureProfiles.profiles = {
+    "Wired Connection 1" = {
+      connection.type = "ethernet";
+      connection.id = "Wired Connection 1";
+      connection.interface-name = "eno1";  # Make sure this matches your interface
+      connection.autoconnect = true;
+      
+      ipv4.method = "automatic";
+#      ipv4.addresses = "192.168.1.100/24";
+#      ipv4.gateway = "192.168.1.1";
+#      ipv4.dns = "8.8.8.8";
+    };
+  };
+
+  # install Nginx for your website bullshit
+  services.nginx = {
+    enable = true;
+    virtualHosts."beefbabe.xyz" = {
+      root = "/srv/www";
+      extraConfig = ''
+        default_type text/html;
+      '';
+      locations = {
+        "/" = {
+          index = "index.html";
+        };
+        "/blog" = {
+          index = "landing.html";
+        };
+      };
+    };
+  };
 
   # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
+  networking.firewall.allowedTCPPorts = [ 80 443 3939 8086 ];
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
+
+  # configure the IPv4 address of this computer
+  networking.interfaces.wlp5s0.ipv4.addresses = [
+    {
+      address = "192.168.1.20";
+      prefixLength = 24;
+    }
+  ];
+  
+  # set default gateway for routing
+  networking.defaultGateway = "192.168.1.1";
+
+  # set the nameservers
+  networking.nameservers = [ "8.8.8.8" ];
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
